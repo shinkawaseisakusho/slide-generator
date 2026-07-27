@@ -9,10 +9,17 @@ import {
   COVER_BAND_Y, HEAD_MID, RULE_Y, RULE_ACCENT_Y, RULE_ACCENT_W, RULE_ACCENT_H,
   HAIRLINE_H, TEXT_COL_W, DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
-  titleSize, headingSize, bodySize, bodyLines,
+  titleSize, headingSize, bodySize, bodyLines, paraSpacePt,
+  BODY_LINE_SPACING,
 } from './layout.js';
 
+/* Noto Sans JP を指定する。web で広く配布されているフォントなので、
+   pptx を読み込むアプリ側で置き換えが起きにくい。 */
 const FONT = 'Noto Sans JP';
+
+/* テキストボックスの内側余白。既定値はアプリによって違い、そのぶん
+   折り返し位置がずれる。0 に固定して、指定した幅をそのまま使わせる。 */
+const INSET = { margin: 0 };
 
 export async function buildPptx(deck, outputType = 'blob') {
   const Ctor = globalThis.PptxGenJS;
@@ -40,11 +47,13 @@ function addCoverSlide(pptx, t, deck) {
   const s = pptx.addSlide();
   s.background = { color: t.bg };
 
+  const titlePt = titleSize(deck.title);
   s.addText(deck.title || '', {
+    ...INSET,
     x: M, y: 1.95, w: CONTENT_W, h: 1.75,
-    fontFace: FONT, fontSize: titleSize(deck.title), bold: true,
+    fontFace: FONT, fontSize: titlePt, bold: true,
     color: t.ink, align: 'left', valign: 'bottom', fit: 'shrink',
-    lineSpacingMultiple: 1.15,
+    lineSpacing: Math.round(titlePt * 1.15),
   });
 
   // 下端いっぱいの色帯。テーマの色がいちばん大きく出るところ
@@ -54,6 +63,7 @@ function addCoverSlide(pptx, t, deck) {
 
   if (deck.subtitle) {
     s.addText(deck.subtitle, {
+      ...INSET,
       x: M, y: COVER_BAND_Y, w: CONTENT_W, h: SLIDE_H - COVER_BAND_Y,
       fontFace: FONT, fontSize: 14, color: t.bg,
       align: 'left', valign: 'middle', fit: 'shrink',
@@ -74,6 +84,7 @@ function addContentSlide(pptx, t, slide, pageNo) {
   if (kind === 'divider') {
     s.background = { color: t.accent };
     s.addText(slide.heading || '', {
+      ...INSET,
       x: M, y: DIVIDER_MID - 0.75, w: CONTENT_W, h: 1.5,
       fontFace: FONT, fontSize: titleSize(slide.heading), bold: true,
       color: t.bg, align: 'center', valign: 'middle', fit: 'shrink',
@@ -84,6 +95,7 @@ function addContentSlide(pptx, t, slide, pageNo) {
   }
 
   s.addText(slide.heading || '', {
+    ...INSET,
     x: M, y: HEAD_MID - 0.33, w: CONTENT_W, h: 0.66,
     fontFace: FONT, fontSize: headingSize(slide.heading), bold: true,
     color: t.accent, align: 'left', valign: 'middle', fit: 'shrink',
@@ -95,24 +107,28 @@ function addContentSlide(pptx, t, slide, pageNo) {
   });
 
   if (kind === 'split') {
-    s.addText(bodyParagraphs(slide.body), {
-      x: M, y: CONTENT_TOP, w: TEXT_COL_W, h: CONTENT_H,
-      fontFace: FONT, fontSize: bodySize(slide.body, true),
-      color: t.ink, valign: 'top', fit: 'shrink', lineSpacingMultiple: 1.3,
-    });
+    addBody(s, t, slide.body, TEXT_COL_W);
     layoutMedia(pptx, s, media, mediaRegion(true));
   } else if (kind === 'media') {
     layoutMedia(pptx, s, media, mediaRegion(false));
   } else {
-    s.addText(bodyParagraphs(slide.body), {
-      x: M, y: CONTENT_TOP, w: CONTENT_W, h: CONTENT_H,
-      fontFace: FONT, fontSize: bodySize(slide.body, false),
-      color: t.ink, valign: 'top', fit: 'shrink', lineSpacingMultiple: 1.35,
-    });
+    addBody(s, t, slide.body, CONTENT_W);
   }
 
   hairline(pptx, s, M, FOOTER_Y, CONTENT_W, t.line);
   addPageNo(s, pageNo, t.muted);
+}
+
+// 本文。枠に収まる大きさをあらかじめ計算しているので自動縮小に頼らない
+function addBody(s, t, body, boxW) {
+  const pt = bodySize(body, boxW, CONTENT_H);
+  s.addText(bodyParagraphs(body, pt), {
+    ...INSET,
+    x: M, y: CONTENT_TOP, w: boxW, h: CONTENT_H,
+    fontFace: FONT, fontSize: pt, color: t.ink,
+    valign: 'top', fit: 'shrink',
+    lineSpacing: Math.round(pt * BODY_LINE_SPACING),
+  });
 }
 
 function hairline(pptx, s, x, y, w, color) {
@@ -121,6 +137,7 @@ function hairline(pptx, s, x, y, w, color) {
 
 function addPageNo(s, pageNo, color) {
   s.addText(String(pageNo), {
+    ...INSET,
     x: SLIDE_W - M - 0.5, y: FOOTER_Y + PAGE_NO_DY, w: 0.5, h: 0.3,
     fontFace: FONT, fontSize: 9, color, align: 'right',
   });
@@ -148,14 +165,15 @@ function layoutMedia(pptx, s, media, region) {
 }
 
 // 改行を段落に。箇条書きの行には中黒を付ける
-function bodyParagraphs(body) {
+function bodyParagraphs(body, sizePt) {
   const lines = bodyLines(body);
+  const space = paraSpacePt(sizePt);
   return lines.map((line, i) => ({
     text: line.text,
     options: {
       bullet: line.bullet ? { characterCode: '2022' } : false,
       breakLine: i < lines.length - 1,
-      paraSpaceAfter: 6,
+      paraSpaceAfter: space,
     },
   }));
 }

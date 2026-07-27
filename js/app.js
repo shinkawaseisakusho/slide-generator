@@ -48,6 +48,11 @@ const el = {
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
 
+/* ファイル入力の設定は HTML にも書いてあるが、ここでも設定しておく。
+   Service Worker が古い index.html を返しても、複数選択が効くようにするため。 */
+el.file.multiple = true;
+el.file.accept = 'image/*,video/*';
+
 /* ---------- 状態 ----------
    phase: 'title' | 'subtitle' | 'heading' | 'body' | 'media' | 'review'
    i:     何枚目の本文スライドを聞いているか (0 始まり)

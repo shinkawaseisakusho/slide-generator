@@ -9,7 +9,8 @@ import {
   RULE_ACCENT_W, RULE_ACCENT_H, HAIRLINE_H, TEXT_COL_W,
   DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
-  titleSize, headingSize, bodySize, bodyLines,
+  titleSize, headingSize, bodySize, bodyLines, paraSpacePt,
+  BODY_LINE_SPACING, BULLET_INDENT,
 } from './layout.js';
 
 const FONT = '"Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif';
@@ -104,14 +105,12 @@ export async function drawSlide(canvas, deck, slide, pageNo) {
   fill(ctx, t.accent, M * S, RULE_ACCENT_Y * S, RULE_ACCENT_W * S, Math.max(2, RULE_ACCENT_H * S));
 
   if (kind === 'split') {
-    drawBody(ctx, slide.body, M * S, CONTENT_TOP * S, TEXT_COL_W * S, CONTENT_H * S,
-             bodySize(slide.body, true) * PT, t.ink);
+    drawBody(ctx, slide.body, S, PT, TEXT_COL_W, t.ink);
     await drawMedia(ctx, S, media, mediaRegion(true));
   } else if (kind === 'media') {
     await drawMedia(ctx, S, media, mediaRegion(false));
   } else {
-    drawBody(ctx, slide.body, M * S, CONTENT_TOP * S, CONTENT_W * S, CONTENT_H * S,
-             bodySize(slide.body, false) * PT, t.ink);
+    drawBody(ctx, slide.body, S, PT, CONTENT_W, t.ink);
   }
 
   fill(ctx, t.line, M * S, FOOTER_Y * S, CONTENT_W * S, Math.max(1, HAIRLINE_H * S));
@@ -150,19 +149,28 @@ function wrapText(ctx, text, maxW) {
   return lines;
 }
 
-function drawBody(ctx, body, x, y, w, h, fontPx, color) {
+// pptx 側と同じ bodySize / 行送りを使うので、プレビューと仕上がりがそろう
+function drawBody(ctx, body, S, PT, boxW, color) {
+  const pt = bodySize(body, boxW, CONTENT_H);
+  const fontPx = pt * PT;
+  const x = M * S;
+  const y = CONTENT_TOP * S;
+  const w = boxW * S;
+  const h = CONTENT_H * S;
+
   ctx.fillStyle = '#' + color;
   ctx.font = `${fontPx}px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  const lh = fontPx * 1.45;
+  const lh = fontPx * BODY_LINE_SPACING;
+  const paraGap = paraSpacePt(pt) * PT;
   let cy = y;
 
   for (const line of bodyLines(body)) {
     if (!line.text) { cy += lh * 0.6; continue; }
 
-    const indent = line.bullet ? fontPx * 1.5 : 0;
+    const indent = line.bullet ? fontPx * BULLET_INDENT : 0;
     const wrapped = wrapText(ctx, line.text, w - indent);
 
     for (let k = 0; k < wrapped.length; k++) {
@@ -171,7 +179,7 @@ function drawBody(ctx, body, x, y, w, h, fontPx, color) {
       ctx.fillText(wrapped[k], x + indent, cy);
       cy += lh;
     }
-    cy += lh * 0.12;
+    cy += paraGap;
   }
 }
 

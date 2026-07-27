@@ -91,11 +91,19 @@ export function fitRect(cell, aspect) {
 
 /* ---------- 文字の大きさ ---------- */
 
-// 全角を1、半角を0.55 として見た目の幅を数える
+/* 文字幅を「全角1文字ぶん（1em）」を単位として見積もる。
+   フォントの実測値を使わないので、どのアプリで開いても同じ答えになる。
+   実測より少し大きめに出て、結果として折り返しに余裕が出る側へ倒している。 */
 export function textUnits(t) {
   let w = 0;
   for (const ch of String(t || '')) {
-    w += /[ -~｡-ﾟ]/.test(ch) ? 0.55 : 1;
+    if (ch === ' ') w += 0.28;
+    else if (/[A-Z]/.test(ch)) w += 0.72;
+    else if (/[a-z]/.test(ch)) w += 0.52;
+    else if (/[0-9]/.test(ch)) w += 0.56;
+    else if (/[!-~]/.test(ch)) w += 0.45;   // 半角記号
+    else if (/[｡-ﾟ]/.test(ch)) w += 0.5;    // 半角カナ
+    else w += 1;                             // 全角
   }
   return w;
 }
@@ -118,13 +126,50 @@ export function headingSize(t, boxW) {
   return fitFontSize(t, boxW || CONTENT_W, 24, 13);
 }
 
-export function bodySize(body, narrow) {
-  const n = (body || '').length;
-  const limit = narrow ? 0.5 : 1;
-  if (n <= 90 * limit) return 16;
-  if (n <= 200 * limit) return 14;
-  if (n <= 400 * limit) return 12;
-  return 11;
+/* ---------- 本文の大きさ ----------
+
+   PowerPoint の自動縮小（normAutofit）は、これを解釈しないアプリでは効かない。
+   そのアプリでは指定どおりの大きさで描かれ、枠からあふれてレイアウトが崩れる。
+   そこで「何行になるか」を自前で見積もり、最初から確実に収まる大きさを選ぶ。
+   これで自動縮小に頼らなくてよくなり、どのアプリでも同じ見た目になる。 */
+
+export const BODY_MAX_PT = 16;
+export const BODY_MIN_PT = 9;
+export const BODY_LINE_SPACING = 1.35;   // 行送り（フォントサイズに対する倍率）
+export const BULLET_INDENT = 1.4;        // 箇条書きのぶら下げ幅（em）
+
+/* 段落のあとの空き。固定値にすると、箇条書きが増えたときに
+   この空きだけで枠を食いつぶしてしまうため、文字の大きさに比例させる。 */
+export function paraSpacePt(sizePt) {
+  return Math.round(sizePt * 0.3);
+}
+
+// 指定の大きさで何行になるかを見積もる
+export function estimateBodyLines(body, boxW, sizePt) {
+  const perLine = (boxW * 72) / sizePt;   // 1行に入る em 数
+  let lines = 0;
+  for (const line of bodyLines(body)) {
+    if (!line.text) { lines += 0.6; continue; }   // 空行は詰めて数える
+    const avail = Math.max(1, perLine - (line.bullet ? BULLET_INDENT : 0));
+    lines += Math.max(1, Math.ceil(textUnits(line.text) / avail));
+  }
+  return lines;
+}
+
+// 指定の大きさで本文全体が何ポイントの高さになるか
+export function bodyHeightPt(body, boxW, sizePt) {
+  const paras = Math.max(0, bodyLines(body).length - 1);
+  return estimateBodyLines(body, boxW, sizePt) * sizePt * BODY_LINE_SPACING
+       + paras * paraSpacePt(sizePt);
+}
+
+// 枠に収まる最大の大きさ。最小まで下げても入らない場合は最小を返す
+export function bodySize(body, boxW, boxH) {
+  const limitPt = boxH * 72;
+  for (let pt = BODY_MAX_PT; pt >= BODY_MIN_PT; pt--) {
+    if (bodyHeightPt(body, boxW, pt) <= limitPt) return pt;
+  }
+  return BODY_MIN_PT;
 }
 
 // 1行を「箇条書きかどうか」と本文に分ける。行頭の ・ - * • を印として扱う
