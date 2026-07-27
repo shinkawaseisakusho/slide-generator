@@ -9,6 +9,16 @@ const MAX_IMAGE_EDGE = 1400;   // 画像の長辺の上限(px)
 const JPEG_QUALITY = 0.82;
 export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
+function videoExtension(file) {
+  const fromName = String(file.name || '').match(/\.([a-z0-9]{2,5})$/i);
+  if (fromName) return fromName[1].toLowerCase();
+
+  const subtype = String(file.type || '').split('/')[1]?.toLowerCase();
+  if (subtype === 'quicktime') return 'mov';
+  if (subtype === 'x-m4v') return 'm4v';
+  return subtype || 'mp4';
+}
+
 /** ファイルの MIME から画像／動画を判別して取り込む */
 export function readMedia(file) {
   return file.type.startsWith('video/') ? readVideo(file) : readImage(file);
@@ -68,6 +78,7 @@ export async function readVideo(file) {
   return {
     kind: 'video',
     name: file.name,
+    extn: videoExtension(file),
     data,
     cover: poster ? poster.data : null,
     aspect: poster ? poster.aspect : 16 / 9,

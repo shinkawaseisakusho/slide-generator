@@ -5,7 +5,9 @@
 import { getTheme } from './theme.js';
 import {
   SLIDE_W, SLIDE_H, M, CONTENT_W, CONTENT_TOP, CONTENT_H, FOOTER_Y,
-  COVER_BAND_Y, COVER_TITLE_BOTTOM, HEAD_MID, RULE_Y, RULE_ACCENT_Y,
+  COVER_BAND_Y, COVER_TITLE_MID, COVER_SUB_PT,
+  COVER_RULE_TOP_Y, COVER_RULE_BOT_Y, COVER_ACCENT_W, COVER_ACCENT_H, COVER_ACCENT_Y,
+  HEAD_MID, RULE_Y, RULE_ACCENT_Y,
   RULE_ACCENT_W, RULE_ACCENT_H, HAIRLINE_H, TEXT_COL_W,
   DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
@@ -56,18 +58,23 @@ export function drawCover(canvas, deck) {
 
   fill(ctx, t.bg, 0, 0, SLIDE_W * S, SLIDE_H * S);
 
+  // タイトルを上下の細い罫線ではさむ
+  fill(ctx, t.line, M * S, COVER_RULE_TOP_Y * S, CONTENT_W * S, Math.max(1, HAIRLINE_H * S));
+
   ctx.fillStyle = '#' + t.ink;
   ctx.font = `bold ${titleSize(deck.title) * PT}px ${FONT}`;
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(deck.title || '', M * S, COVER_TITLE_BOTTOM * S - 0.1 * S);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(deck.title || '', M * S, COVER_TITLE_MID * S);
+
+  fill(ctx, t.line, M * S, COVER_RULE_BOT_Y * S, CONTENT_W * S, Math.max(1, HAIRLINE_H * S));
+  fill(ctx, t.accent, M * S, COVER_ACCENT_Y * S, COVER_ACCENT_W * S, Math.max(2, COVER_ACCENT_H * S));
 
   fill(ctx, t.accent, 0, COVER_BAND_Y * S, SLIDE_W * S, (SLIDE_H - COVER_BAND_Y) * S);
 
   if (deck.subtitle) {
     ctx.fillStyle = '#' + t.bg;
-    ctx.font = `${14 * PT}px ${FONT}`;
-    ctx.textBaseline = 'middle';
+    ctx.font = `${COVER_SUB_PT * PT}px ${FONT}`;
     ctx.fillText(deck.subtitle, M * S, (COVER_BAND_Y + (SLIDE_H - COVER_BAND_Y) / 2) * S);
   }
 }

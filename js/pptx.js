@@ -6,7 +6,9 @@
 import { getTheme } from './theme.js';
 import {
   SLIDE_W, SLIDE_H, M, CONTENT_W, CONTENT_TOP, CONTENT_H, FOOTER_Y,
-  COVER_BAND_Y, HEAD_MID, RULE_Y, RULE_ACCENT_Y, RULE_ACCENT_W, RULE_ACCENT_H,
+  COVER_BAND_Y, COVER_TITLE_Y, COVER_TITLE_H, COVER_SUB_PT,
+  COVER_RULE_TOP_Y, COVER_RULE_BOT_Y, COVER_ACCENT_W, COVER_ACCENT_H, COVER_ACCENT_Y,
+  HEAD_MID, RULE_Y, RULE_ACCENT_Y, RULE_ACCENT_W, RULE_ACCENT_H,
   HAIRLINE_H, TEXT_COL_W, DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
   titleSize, headingSize, bodySize, bodyLines, paraSpacePt,
@@ -48,12 +50,21 @@ function addCoverSlide(pptx, t, deck) {
   s.background = { color: t.bg };
 
   const titlePt = titleSize(deck.title);
+
+  // タイトルを上下の細い罫線ではさむ
+  hairline(pptx, s, M, COVER_RULE_TOP_Y, CONTENT_W, t.line);
+
   s.addText(deck.title || '', {
     ...INSET,
-    x: M, y: 1.95, w: CONTENT_W, h: 1.75,
+    x: M, y: COVER_TITLE_Y, w: CONTENT_W, h: COVER_TITLE_H,
     fontFace: FONT, fontSize: titlePt, bold: true,
-    color: t.ink, align: 'left', valign: 'bottom', fit: 'shrink',
+    color: t.ink, align: 'left', valign: 'middle', fit: 'shrink',
     lineSpacing: Math.round(titlePt * 1.15),
+  });
+
+  hairline(pptx, s, M, COVER_RULE_BOT_Y, CONTENT_W, t.line);
+  s.addShape(pptx.ShapeType.rect, {
+    x: M, y: COVER_ACCENT_Y, w: COVER_ACCENT_W, h: COVER_ACCENT_H, fill: { color: t.accent },
   });
 
   // 下端いっぱいの色帯。テーマの色がいちばん大きく出るところ
@@ -65,7 +76,7 @@ function addCoverSlide(pptx, t, deck) {
     s.addText(deck.subtitle, {
       ...INSET,
       x: M, y: COVER_BAND_Y, w: CONTENT_W, h: SLIDE_H - COVER_BAND_Y,
-      fontFace: FONT, fontSize: 14, color: t.bg,
+      fontFace: FONT, fontSize: COVER_SUB_PT, color: t.bg,
       align: 'left', valign: 'middle', fit: 'shrink',
     });
   }
@@ -157,11 +168,24 @@ function layoutMedia(pptx, s, media, region) {
     }
 
     if (m.kind === 'video') {
-      const opts = { type: 'video', data: m.data, ...box };
+      const opts = { type: 'video', data: m.data, extn: videoExtension(m), ...box };
       if (m.cover) opts.cover = m.cover;
       s.addMedia(opts);
     }
   });
+}
+
+// iPhoneの動画は MIME が video/quicktime になるが、PPTX内の拡張子は .mov にする必要がある。
+// extnを保存していない旧下書きも、元のファイル名またはData URLから補正する。
+function videoExtension(media) {
+  const fromName = String(media.name || '').match(/\.([a-z0-9]{2,5})$/i);
+  if (fromName) return fromName[1].toLowerCase();
+  if (media.extn) return String(media.extn).toLowerCase();
+
+  const subtype = String(media.data || '').match(/^data:video\/([^;,]+)/i)?.[1]?.toLowerCase();
+  if (subtype === 'quicktime') return 'mov';
+  if (subtype === 'x-m4v') return 'm4v';
+  return subtype || 'mp4';
 }
 
 // 改行を段落に。箇条書きの行には中黒を付ける

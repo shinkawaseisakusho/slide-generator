@@ -13,14 +13,28 @@ export const FOOTER_Y = 5.16;                // 下端の罫線。本文はこ�
 export const CONTENT_H = FOOTER_Y - 0.16 - CONTENT_TOP;
 export const MAX_MEDIA = 4;                  // 1枚のスライドに載せられるメディアの数
 
-export const COVER_BAND_Y = 4.3;             // 表紙の色帯の上端
-export const COVER_TITLE_BOTTOM = 3.7;       // 表紙タイトルの下端
-export const HEAD_MID = 0.83;                // 見出しの中心
-export const RULE_Y = 1.30;                  // 見出し下の細い罫線
-export const RULE_ACCENT_Y = 1.283;          // 左端に重ねる太い線
-export const RULE_ACCENT_W = 0.85;
+export const HAIRLINE_H = 0.012;             // 細い罫線の太さ
+
+export const HEAD_MID = 0.72;                // 見出しの中心
+export const RULE_Y = 1.19;                  // 見出し下の細い罫線
+export const RULE_ACCENT_W = 0.85;           // 左端に重ねる太い線
 export const RULE_ACCENT_H = 0.042;
-export const HAIRLINE_H = 0.012;
+export const RULE_ACCENT_Y = RULE_Y - (RULE_ACCENT_H - HAIRLINE_H) / 2;
+
+export const COVER_BAND_Y = 4.3;             // 表紙の色帯の上端
+export const COVER_SUB_PT = 16;              // 色帯の中のサブタイトル
+
+/* 表紙タイトルは、色帯より上の白地（0〜COVER_BAND_Y）の中央に置く。
+   上下に細い罫線を渡し、下の罫線の左端だけ太いアクセントにする。
+   本文スライドの見出しと同じ組み方なので、表紙だけ浮かない。 */
+export const COVER_TITLE_H = 1.6;
+export const COVER_TITLE_Y = (COVER_BAND_Y - COVER_TITLE_H) / 2;
+export const COVER_TITLE_MID = COVER_TITLE_Y + COVER_TITLE_H / 2;
+export const COVER_RULE_TOP_Y = COVER_TITLE_Y;
+export const COVER_RULE_BOT_Y = COVER_TITLE_Y + COVER_TITLE_H;
+export const COVER_ACCENT_W = 1.1;
+export const COVER_ACCENT_H = 0.05;
+export const COVER_ACCENT_Y = COVER_RULE_BOT_Y - (COVER_ACCENT_H - HAIRLINE_H) / 2;
 export const TEXT_COL_W = 3.95;              // 文章とメディアを並べるときの文章側の幅
 export const DIVIDER_MID = 2.7;              // 中扉の見出しの中心
 export const DIVIDER_RULE_Y = 3.55;
