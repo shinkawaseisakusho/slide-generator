@@ -7,7 +7,7 @@
      theme.js   … 配色
      pptx.js    … .pptx の組み立て
      preview.js … 確認画面のプレビュー描画
-     media.js   … 画像・動画の取り込み
+     media.js   … 画像の取り込み
      storage.js … 下書きの保存
    ========================================================= */
 
@@ -17,6 +17,7 @@ import { buildPptx, safeFileName } from './pptx.js';
 import { drawCover, drawSlide } from './preview.js';
 import { readMedia, ensureAspects } from './media.js';
 import { saveDraft, loadDraft, clearDraft } from './storage.js';
+import { ENABLE_VIDEO } from './config.js';
 
 const MAX_HISTORY = 40;
 const INPUT_MAX_H = 134;
@@ -58,7 +59,7 @@ const isTouch = window.matchMedia('(pointer: coarse)').matches;
 /* ファイル入力の設定は HTML にも書いてあるが、ここでも設定しておく。
    Service Worker が古い index.html を返しても、複数選択が効くようにするため。 */
 el.file.multiple = true;
-el.file.accept = 'image/*,video/*';
+el.file.accept = ENABLE_VIDEO ? 'image/*,video/*' : 'image/*';
 
 /* ---------- 状態 ----------
    phase: 'title' | 'subtitle' | 'heading' | 'body' | 'media' | 'review'
@@ -98,7 +99,7 @@ const QUESTIONS = {
     sub: '任意です。改行で箇条書きになります（行の先頭に「・」でもOK）',
   }),
   media: (i) => ({
-    text: `${i + 2}枚目に画像や動画を入れますか？`,
+    text: `${i + 2}枚目に${ENABLE_VIDEO ? '画像や動画' : '画像'}を入れますか？`,
     sub: `任意です。1枚のスライドに最大${MAX_MEDIA}点まで並べられます`,
   }),
 };
@@ -186,7 +187,7 @@ function updateComposer() {
         state.skipMedia = true;
         pushLog({
           role: 'bot',
-          text: 'これ以降は画像・動画の質問をとばします。',
+          text: `これ以降は${ENABLE_VIDEO ? '画像・動画' : '画像'}の質問をとばします。`,
           sub: '確認画面からはいつでも追加できます',
         });
         next();
@@ -218,9 +219,12 @@ function updateComposer() {
         chips.push([`ここまでで完成（全${state.i + 1}枚）`, 'accent', finish]);
       }
       if (state.skipMedia) {
-        chips.push(['画像・動画の質問を戻す', '', () => {
+        chips.push([`${ENABLE_VIDEO ? '画像・動画' : '画像'}の質問を戻す`, '', () => {
           state.skipMedia = false;
-          pushLog({ role: 'bot', text: '画像・動画の質問を再開します。' });
+          pushLog({
+            role: 'bot',
+            text: `${ENABLE_VIDEO ? '画像・動画' : '画像'}の質問を再開します。`,
+          });
           save();
           updateComposer();
         }]);
@@ -427,7 +431,7 @@ el.file.addEventListener('change', async () => {
 
   for (let k = 0; k < accepted.length; k++) {
     const file = accepted[k];
-    const isVideo = file.type.startsWith('video/');
+    const isVideo = ENABLE_VIDEO && file.type.startsWith('video/');
     const count = accepted.length > 1 ? `（${k + 1}/${accepted.length}）` : '';
     showOverlay(isVideo ? `動画を読み込み中…${count}` : `画像を読み込み中…${count}`);
 
@@ -437,7 +441,11 @@ el.file.addEventListener('change', async () => {
       if (!addMediaToSlide(slideIdx, item)) break;
       added++;
       if (target === null) {
-        pushLog({ role: 'user', img: item.cover || item.data, text: isVideo ? file.name : null });
+        pushLog({
+          role: 'user',
+          img: item.cover || item.data,
+          text: isVideo ? file.name : null,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -545,7 +553,10 @@ function slideCard(slide, idx) {
 
   const add = div('media-add');
   if (media.length < MAX_MEDIA) {
-    add.appendChild(linkBtn('＋ 画像・動画を追加', () => pickFile(idx)));
+    add.appendChild(linkBtn(
+      `＋ ${ENABLE_VIDEO ? '画像・動画' : '画像'}を追加`,
+      () => pickFile(idx)
+    ));
   } else {
     const note = document.createElement('span');
     note.className = 'media-note';
@@ -768,7 +779,8 @@ function triggerDownload(blob, fileName) {
 async function download() {
   if (!state.title.trim()) { toast('タイトルを入力してください'); return; }
 
-  const hasVideo = state.slides.some(s => (s.media || []).some(m => m.kind === 'video'));
+  const hasVideo = ENABLE_VIDEO
+    && state.slides.some(s => (s.media || []).some(m => m.kind === 'video'));
   showOverlay(hasVideo ? '動画を含めて作成中…' : 'スライドを作成中…');
 
   try {
@@ -785,7 +797,7 @@ async function download() {
     el.howto.open = true;
   } catch (err) {
     console.error(err);
-    toast('作成に失敗しました。画像や動画を減らして試してください');
+    toast(`作成に失敗しました。${ENABLE_VIDEO ? '画像や動画' : '画像'}を減らして試してください`);
   } finally {
     hideOverlay();
   }
@@ -811,9 +823,6 @@ async function saveNow() {
     saveFailed = true;
     return;
   }
-  if (where === 'local' && !saveFailed) {
-    toast('この端末では動画を含まない下書きのみ保存します');
-  }
   saveFailed = false;
 }
 
@@ -821,8 +830,11 @@ async function saveNow() {
 function migrateSlide(s) {
   const slide = { heading: s.heading || '', body: s.body || '', media: [] };
   if (Array.isArray(s.media)) {
-    // data を持たないもの（保存対象外だった動画・廃止したYouTubeリンク）は落とす
-    slide.media = s.media.filter(m => m && m.data && m.kind !== 'online');
+    // 無効な種類は復元しない。動画機能を戻した場合は既存の動画下書きも使える。
+    slide.media = s.media.filter(m => (
+      m && m.data
+      && (m.kind === 'image' || !m.kind || (ENABLE_VIDEO && m.kind === 'video'))
+    ));
   } else if (s.image) {
     slide.media = [{ kind: 'image', data: s.image }];
   }

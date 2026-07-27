@@ -1,27 +1,21 @@
-/* 画像・動画の取り込み。
-   端末の中だけで完結させるため、縮小もポスター抽出も canvas で行う。
+/* 画像の取り込み。
+   端末の中だけで完結させるため、縮小と形式変換は canvas で行う。
 
    返す形:
      { kind: 'image', data, aspect }
      { kind: 'video', data, cover, aspect, name } */
 
+import { ENABLE_VIDEO } from './config.js';
+
 const MAX_IMAGE_EDGE = 1400;   // 画像の長辺の上限(px)
 const JPEG_QUALITY = 0.82;
 export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
-function videoExtension(file) {
-  const fromName = String(file.name || '').match(/\.([a-z0-9]{2,5})$/i);
-  if (fromName) return fromName[1].toLowerCase();
-
-  const subtype = String(file.type || '').split('/')[1]?.toLowerCase();
-  if (subtype === 'quicktime') return 'mov';
-  if (subtype === 'x-m4v') return 'm4v';
-  return subtype || 'mp4';
-}
-
-/** ファイルの MIME から画像／動画を判別して取り込む */
+/** ブラウザが読み込める画像形式を取り込む */
 export function readMedia(file) {
-  return file.type.startsWith('video/') ? readVideo(file) : readImage(file);
+  if (file.type.startsWith('image/')) return readImage(file);
+  if (ENABLE_VIDEO && file.type.startsWith('video/')) return readVideo(file);
+  return Promise.reject(new Error('画像ファイルを選んでください'));
 }
 
 export function readImage(file) {
@@ -61,7 +55,19 @@ export function readImage(file) {
   });
 }
 
+// 以下の動画処理は将来の再有効化に備えて残している。
+function videoExtension(file) {
+  const fromName = String(file.name || '').match(/\.([a-z0-9]{2,5})$/i);
+  if (fromName) return fromName[1].toLowerCase();
+
+  const subtype = String(file.type || '').split('/')[1]?.toLowerCase();
+  if (subtype === 'quicktime') return 'mov';
+  if (subtype === 'x-m4v') return 'm4v';
+  return subtype || 'mp4';
+}
+
 export async function readVideo(file) {
+  if (!ENABLE_VIDEO) throw new Error('画像ファイルを選んでください');
   if (file.size > MAX_VIDEO_BYTES) {
     const mb = (file.size / 1024 / 1024).toFixed(0);
     throw new Error(`動画は${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)}MBまでです（${mb}MB）`);
@@ -85,7 +91,6 @@ export async function readVideo(file) {
   };
 }
 
-// 動画の1コマ目を取り出してポスター画像にする（失敗しても致命的ではない）
 function videoPoster(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -93,7 +98,6 @@ function videoPoster(file) {
     const done = (fn) => (arg) => { URL.revokeObjectURL(url); fn(arg); };
     const fail = done(reject);
     const ok = done(resolve);
-
     const timer = setTimeout(() => fail(new Error('timeout')), 8000);
 
     v.preload = 'metadata';
@@ -101,7 +105,6 @@ function videoPoster(file) {
     v.playsInline = true;
     v.onerror = () => { clearTimeout(timer); fail(new Error('動画を開けませんでした')); };
     v.onloadeddata = () => {
-      // 先頭は真っ黒なことが多いので少しだけ進める
       v.currentTime = Math.min(0.2, (v.duration || 1) / 2);
     };
     v.onseeked = () => {

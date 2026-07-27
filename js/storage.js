@@ -2,8 +2,8 @@
 
    IndexedDB を使う。localStorage は 5MB 前後が上限で、画像を10枚ほど
    入れると保存できなくなるため。IndexedDB が使えない環境（プライベート
-   モードなど）では localStorage に落とし、そのときだけ容量の大きい
-   動画を保存対象から外す。 */
+   モードなど）では localStorage に落とす。動画機能を再び有効にした場合も、
+   容量の大きい動画本体は localStorage の保存対象から外す。 */
 
 const LS_KEY = 'slide-generator/v1';
 const DB_NAME = 'slide-generator';
@@ -37,13 +37,15 @@ function run(mode, fn) {
   }));
 }
 
-// localStorage に落とすときは動画を外す（base64のままでは到底入らない）
+// 動画機能は現在無効。将来の再有効化に備えた localStorage 用の軽量化処理。
 function withoutVideo(draft) {
   return {
     ...draft,
     slides: (draft.slides || []).map((s) => ({
       ...s,
-      media: (s.media || []).map((m) => (m.kind === 'video' ? { ...m, data: null, cover: null } : m)),
+      media: (s.media || []).map((m) => (
+        m.kind === 'video' ? { ...m, data: null, cover: null } : m
+      )),
     })),
   };
 }

@@ -1,3 +1,5 @@
+import { ENABLE_VIDEO } from './config.js';
+
 /* スライドの寸法とレイアウト計算。
    pptx 生成（pptx.js）と画面プレビュー（preview.js）の両方から使う。
    ここを共通化しておかないと、プレビューと実際の仕上がりがずれる。
@@ -43,10 +45,14 @@ export const PAGE_NO_DY = 0.04;
 
 /* ---------- スライドの種類 ---------- */
 
-// 描けないメディア（保存で中身を落とした動画など）は数に入れない。
-// 入れてしまうと「メディアあり」判定になり、空の余白だけのスライドになる
+// 読み込める画像だけを数える。旧下書きに残った別形式はここでも除外する。
 export function visibleMedia(slide) {
-  return (slide.media || []).filter(m => m && m.data).slice(0, MAX_MEDIA);
+  return (slide.media || [])
+    .filter(m => (
+      m && m.data
+      && (m.kind === 'image' || !m.kind || (ENABLE_VIDEO && m.kind === 'video'))
+    ))
+    .slice(0, MAX_MEDIA);
 }
 
 // 内容とメディアの有無で4通り。'divider' は見出しだけの中扉

@@ -388,6 +388,7 @@ svg { width: 1em; height: 1em; display: block; }
 
 .media-frame img { object-fit: cover; }
 
+/* 動画機能は現在無効。以下は将来の再有効化に備えて残している。 */
 .media-ph {
   display: grid;
   place-items: center;

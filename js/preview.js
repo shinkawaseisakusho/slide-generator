@@ -208,6 +208,7 @@ async function drawMedia(ctx, S, media, region) {
   }
 }
 
+// 動画機能は現在無効だが、将来の再有効化に備えて表示処理を残す。
 function playBadge(ctx, box, S) {
   const cx = (box.x + box.w / 2) * S;
   const cy = (box.y + box.h / 2) * S;

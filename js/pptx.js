@@ -160,7 +160,7 @@ function layoutMedia(pptx, s, media, region) {
   media.forEach((m, k) => {
     const box = fitRect(cells[k], m.aspect);
 
-    if (m.kind === 'image') {
+    if (m.kind === 'image' || !m.kind) {
       // pptxgenjs の sizing:contain は data URL だと寸法を計算できず、
       // 指定した箱にそのまま引き伸ばされてしまう。自分で矩形を出して渡す
       s.addImage({ data: m.data, ...box });
@@ -175,8 +175,7 @@ function layoutMedia(pptx, s, media, region) {
   });
 }
 
-// iPhoneの動画は MIME が video/quicktime になるが、PPTX内の拡張子は .mov にする必要がある。
-// extnを保存していない旧下書きも、元のファイル名またはData URLから補正する。
+// 動画機能は現在無効だが、将来の再有効化に備えて埋め込み処理を残す。
 function videoExtension(media) {
   const fromName = String(media.name || '').match(/\.([a-z0-9]{2,5})$/i);
   if (fromName) return fromName[1].toLowerCase();
