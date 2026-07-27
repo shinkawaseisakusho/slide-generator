@@ -89,15 +89,15 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/>
         </svg>
-        スライドを保存・共有
+        スライドをダウンロード
       </button>
-      <p class="hint">PowerPoint形式（.pptx）で保存・メール送信できます</p>
+      <p class="hint">PowerPoint形式（.pptx）で保存されます</p>
     </div>
 
     <details class="howto" id="howto">
       <summary>ダウンロードしたファイルについて</summary>
       <p class="howto-note">PowerPoint形式（.pptx）で保存されます。
-        スマートフォンでは、メールなどへの共有や端末への保存を選べます。
+        スマートフォンでもダウンロード後、メールなどに添付できます。
         PowerPoint や Keynote、その他 .pptx を開けるアプリでそのまま編集できます。<br>
         作成とダウンロードはオフラインでもできます。</p>
       <p class="howto-warn">動画を入れた場合のご注意<br>
@@ -113,19 +113,6 @@
 <div id="overlay" class="overlay hidden">
   <div class="spinner"><span></span><span></span><span></span></div>
   <p id="overlay-text">作成中…</p>
-</div>
-
-<div id="export-sheet" class="export-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="export-title">
-  <div class="export-panel">
-    <h3 id="export-title">スライドができました</h3>
-    <p id="export-file-name" class="export-file-name"></p>
-    <p id="export-note" class="export-note">メールに添付する場合は「メールなどで共有」を選んでください。</p>
-    <div class="export-actions">
-      <button id="btn-share-file" class="export-primary" type="button">メールなどで共有</button>
-      <a id="btn-save-file" class="export-secondary" href="#" download>端末に保存</a>
-      <button id="btn-close-export" class="export-close" type="button">閉じる</button>
-    </div>
-  </div>
 </div>
 
 <!-- CDNではなく同梱版を読む。これで通信なしでも動く -->

@@ -45,12 +45,6 @@ const el = {
   toast:     document.getElementById('toast'),
   overlay:   document.getElementById('overlay'),
   overlayTx: document.getElementById('overlay-text'),
-  exportSheet: document.getElementById('export-sheet'),
-  exportName:  document.getElementById('export-file-name'),
-  exportNote:  document.getElementById('export-note'),
-  shareFile:   document.getElementById('btn-share-file'),
-  saveFile:    document.getElementById('btn-save-file'),
-  closeExport: document.getElementById('btn-close-export'),
 };
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
@@ -69,9 +63,6 @@ let history = [];
 let saveFailed = false;
 let pickTarget = null;   // 確認画面から追加するときのスライド添え字（チャット中は null）
 let lastDeleted = null;  // 「元に戻す」用
-let preparedFile = null;
-let preparedUrl = '';
-let preparedCleanupTimer = null;
 
 function newState() {
   return {
@@ -754,72 +745,18 @@ function textField(label, value, onChange, rows) {
 }
 
 /* =========================================================
-   保存・共有
+   ダウンロード
    ========================================================= */
 
-function clearPreparedFile() {
-  clearTimeout(preparedCleanupTimer);
-  preparedCleanupTimer = null;
-  if (preparedUrl) URL.revokeObjectURL(preparedUrl);
-  preparedUrl = '';
-  preparedFile = null;
-  el.saveFile.removeAttribute('href');
-}
-
-function canShareFile(file) {
-  if (!navigator.share || !navigator.canShare || !(file instanceof File)) return false;
-  try {
-    return navigator.canShare({ files: [file] });
-  } catch (_) {
-    return false;
-  }
-}
-
-function openExportSheet(file) {
-  clearPreparedFile();
-  preparedFile = file;
-  preparedUrl = URL.createObjectURL(file);
-  el.exportName.textContent = file.name;
-  el.saveFile.href = preparedUrl;
-  el.saveFile.download = file.name;
-  const shareable = canShareFile(file);
-  el.shareFile.classList.toggle('hidden', !shareable);
-  el.exportNote.textContent = shareable
-    ? 'メールに添付する場合は「メールなどで共有」を選んでください。'
-    : '「端末に保存」したあと、メールアプリからファイルを添付してください。';
-  el.exportSheet.classList.remove('hidden');
-}
-
-function closeExportSheet(revokeNow = true) {
-  el.exportSheet.classList.add('hidden');
-  if (revokeNow) clearPreparedFile();
-}
-
-function triggerDownload(file) {
-  const url = URL.createObjectURL(file);
+function triggerDownload(blob, fileName) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = file.name;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
-}
-
-async function sharePreparedFile() {
-  if (!preparedFile || !canShareFile(preparedFile)) return;
-  try {
-    await navigator.share({
-      title: preparedFile.name,
-      files: [preparedFile],
-    });
-    closeExportSheet();
-    toast('共有先を選択しました');
-  } catch (err) {
-    if (err && err.name === 'AbortError') return;
-    console.error(err);
-    toast('共有できませんでした。「端末に保存」をお試しください');
-  }
 }
 
 async function download() {
@@ -833,14 +770,9 @@ async function download() {
     const generated = await buildPptx(state);
     const blob = new Blob([generated], { type: PPTX_MIME });
     const fileName = safeFileName(state.title) + '.pptx';
-    const file = new File([blob], fileName, { type: PPTX_MIME, lastModified: Date.now() });
 
-    if (canShareFile(file) || isTouch) {
-      openExportSheet(file);
-    } else {
-      triggerDownload(file);
-      toast('ダウンロードしました');
-    }
+    triggerDownload(blob, fileName);
+    toast('PowerPointファイルをダウンロードしました');
     el.howto.open = true;
   } catch (err) {
     console.error(err);
@@ -974,19 +906,6 @@ el.back.addEventListener('click', goBack);
 el.reset.addEventListener('click', reset);
 el.input.addEventListener('input', autosize);
 el.download.addEventListener('click', download);
-el.shareFile.addEventListener('click', sharePreparedFile);
-el.saveFile.addEventListener('click', () => {
-  toast('PowerPointファイルを保存しました');
-  closeExportSheet(false);
-  preparedCleanupTimer = setTimeout(clearPreparedFile, 60000);
-});
-el.closeExport.addEventListener('click', () => closeExportSheet());
-el.exportSheet.addEventListener('click', (e) => {
-  if (e.target === el.exportSheet) closeExportSheet();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !el.exportSheet.classList.contains('hidden')) closeExportSheet();
-});
 
 el.input.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
