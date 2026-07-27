@@ -1,12 +1,13 @@
 /* 開発用の静的サーバー（依存パッケージなし）
    使い方: npm run dev  →  http://localhost:8000 */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 
 const PORT = Number(process.env.PORT) || 8000;
-const ROOT = __dirname;
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

@@ -1,14 +1,22 @@
 /* Service Worker
    一度開いたあとは通信なしで動くようにする。
-   アプリを更新したら CACHE の版数を上げること。 */
 
-const CACHE = 'slide-generator-v1';
+   CACHE の版数は `npm run bump` で書き換わる（手で編集しなくてよい）。
+   公開前に一度実行しておくと、利用者の端末に古い版が残らない。 */
+
+const CACHE = 'slide-generator-v2';
 
 const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './js/app.js',
+  './js/layout.js',
+  './js/theme.js',
+  './js/pptx.js',
+  './js/preview.js',
+  './js/media.js',
+  './js/storage.js',
   './vendor/pptxgen.bundle.js',
   './manifest.webmanifest',
   './icon.svg',

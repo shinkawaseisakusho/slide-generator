@@ -27,6 +27,7 @@
       </svg>
     </span>
     <span class="wordmark">スライドジェネレーター</span>
+    <span id="progress" class="progress" aria-live="polite"></span>
   </div>
   <button id="btn-reset" class="icon-btn" type="button" title="最初からやり直す" aria-label="最初からやり直す">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -59,7 +60,7 @@
     </div>
   </div>
 
-  <input type="file" id="file" accept="image/*" hidden>
+  <input type="file" id="file" accept="image/*,video/*" multiple hidden>
 </footer>
 
 <!-- ============ 確認・編集画面 ============ -->
@@ -78,6 +79,11 @@
       スライドを追加する
     </button>
 
+    <div class="theme-picker">
+      <span class="picker-label">テーマカラー</span>
+      <div id="themes" class="theme-row" role="radiogroup" aria-label="テーマカラー"></div>
+    </div>
+
     <div class="actions">
       <button id="btn-download" class="primary-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -89,15 +95,14 @@
     </div>
 
     <details class="howto" id="howto">
-      <summary>Googleスライドで開く方法</summary>
-      <ol>
-        <li>上のボタンでファイルをダウンロード</li>
-        <li><a href="https://drive.google.com/" target="_blank" rel="noopener">Googleドライブ</a> を開く</li>
-        <li>「＋新規」→「ファイルをアップロード」でダウンロードしたファイルを選ぶ</li>
-        <li>アップロードされたファイルをタップすると Googleスライド として開きます</li>
-      </ol>
-      <p class="howto-note">スマホの場合は Googleドライブアプリ の「＋」→「アップロード」からでもOKです。<br>
-        スライドの作成とダウンロードはオフラインでもできます。Googleドライブへのアップロードのときだけ通信が必要です。</p>
+      <summary>ダウンロードしたファイルについて</summary>
+      <p class="howto-note">PowerPoint形式（.pptx）で保存されます。
+        PowerPoint や Keynote、その他 .pptx を開けるアプリでそのまま編集できます。<br>
+        作成とダウンロードはオフラインでもできます。</p>
+      <p class="howto-warn">動画を入れた場合のご注意<br>
+        動画はファイルの中に埋め込まれ、<b>PowerPoint や Keynote で再生できます</b>。
+        ただし .pptx を読み込むアプリによっては、動画が再生されずポスター画像（静止画）として
+        表示されることがあります。</p>
     </details>
   </div>
 </main>
@@ -111,7 +116,7 @@
 
 <!-- CDNではなく同梱版を読む。これで通信なしでも動く -->
 <script src="vendor/pptxgen.bundle.js"></script>
-<script src="app.js"></script>
+<script type="module" src="js/app.js"></script>
 <script>
   // オフライン対応。file:// で直接開いた場合やHTTP接続では登録されない（仕様）
   if ('serviceWorker' in navigator) {
