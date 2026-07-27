@@ -24,6 +24,12 @@ const SAVE_DEBOUNCE = 300;
 const PREVIEW_DEBOUNCE = 250;
 const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
+// iOS/iPadOS Safari は、JavaScriptで作ったBlobを既知の文書形式として渡すと
+// ダウンロードせずプレビュー表示することがある。拡張子は .pptx のまま、
+// iPhone/iPadだけ汎用バイナリとして渡して「保存するファイル」にする。
+const isAppleMobile = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 // ---------- 要素 ----------
 const el = {
   chat:      document.getElementById('chat'),
@@ -768,7 +774,10 @@ async function download() {
   try {
     await ensureAspects(state.slides);
     const generated = await buildPptx(state);
-    const blob = new Blob([generated], { type: PPTX_MIME });
+    const blob = new Blob(
+      [generated],
+      { type: isAppleMobile ? 'application/octet-stream' : PPTX_MIME }
+    );
     const fileName = safeFileName(state.title) + '.pptx';
 
     triggerDownload(blob, fileName);
