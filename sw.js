@@ -4,7 +4,7 @@
    CACHE の版数は `npm run bump` で書き換わる（手で編集しなくてよい）。
    公開前に一度実行しておくと、利用者の端末に古い版が残らない。 */
 
-const CACHE = 'slide-generator-v3';
+const CACHE = 'slide-generator-v4';
 
 const ASSETS = [
   './',
