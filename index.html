@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b0c12" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f6fb" media="(prefers-color-scheme: light)">
+<meta name="description" content="見出し・内容・画像を順番に送るだけでスライドを作れる、ログイン不要のツールです。">
+<title>スライドジェネレーター｜答えるだけでスライドが作れる</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="スライド">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-title">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2.5" y="4" width="19" height="13" rx="2.5"/>
+        <path d="M8 21h8M12 17v4"/>
+      </svg>
+    </span>
+    <span class="wordmark">スライドジェネレーター</span>
+  </div>
+  <button id="btn-reset" class="icon-btn" type="button" title="最初からやり直す" aria-label="最初からやり直す">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11a9 9 0 1 1 2.6 6.4"/><path d="M3 20v-5h5"/>
+    </svg>
+  </button>
+</header>
+
+<!-- ============ チャット画面 ============ -->
+<main id="view-chat" class="view">
+  <div id="chat" class="chat" role="log" aria-live="polite"></div>
+</main>
+
+<footer id="composer" class="composer">
+  <div class="composer-inner">
+    <div id="quick" class="quick"></div>
+
+    <div class="composer-row">
+      <button id="btn-back" class="round-btn" type="button" title="ひとつ前に戻る" aria-label="ひとつ前に戻る">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>
+        </svg>
+      </button>
+      <textarea id="input" rows="1" placeholder="ここに入力…" autocomplete="off" enterkeyhint="send"></textarea>
+      <button id="btn-send" class="send-btn" type="button" aria-label="送信">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <input type="file" id="file" accept="image/*" hidden>
+</footer>
+
+<!-- ============ 確認・編集画面 ============ -->
+<main id="view-review" class="view hidden">
+  <div class="review-wrap">
+    <span class="eyebrow">STEP 2 / 2</span>
+    <h2 class="review-title">できあがり！</h2>
+    <p class="review-sub">タップして直せます。並べ替え・削除もできます。</p>
+
+    <div id="cards"></div>
+
+    <button id="btn-add" class="ghost-btn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      スライドを追加する
+    </button>
+
+    <div class="actions">
+      <button id="btn-download" class="primary-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/>
+        </svg>
+        スライドをダウンロード
+      </button>
+      <p class="hint">PowerPoint形式（.pptx）で保存されます</p>
+    </div>
+
+    <details class="howto" id="howto">
+      <summary>Googleスライドで開く方法</summary>
+      <ol>
+        <li>上のボタンでファイルをダウンロード</li>
+        <li><a href="https://drive.google.com/" target="_blank" rel="noopener">Googleドライブ</a> を開く</li>
+        <li>「＋新規」→「ファイルをアップロード」でダウンロードしたファイルを選ぶ</li>
+        <li>アップロードされたファイルをタップすると Googleスライド として開きます</li>
+      </ol>
+      <p class="howto-note">スマホの場合は Googleドライブアプリ の「＋」→「アップロード」からでもOKです。<br>
+        スライドの作成とダウンロードはオフラインでもできます。Googleドライブへのアップロードのときだけ通信が必要です。</p>
+    </details>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<div id="overlay" class="overlay hidden">
+  <div class="spinner"><span></span><span></span><span></span></div>
+  <p id="overlay-text">作成中…</p>
+</div>
+
+<!-- CDNではなく同梱版を読む。これで通信なしでも動く -->
+<script src="vendor/pptxgen.bundle.js"></script>
+<script src="app.js"></script>
+<script>
+  // オフライン対応。file:// で直接開いた場合やHTTP接続では登録されない（仕様）
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('Service Worker の登録に失敗しました:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
