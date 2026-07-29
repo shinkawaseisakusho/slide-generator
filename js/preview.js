@@ -2,7 +2,7 @@
    pptx.js と同じ layout.js の値を使って canvas に描くので、
    実際の仕上がりとずれない。 */
 
-import { getTheme } from './theme.js';
+import { getTheme, cardSurface } from './theme.js';
 import {
   SLIDE_W, SLIDE_H, M, CONTENT_W, CONTENT_TOP, CONTENT_H, FOOTER_Y,
   COVER_BAND_Y, COVER_TITLE_MID, COVER_SUB_PT,
@@ -11,8 +11,11 @@ import {
   RULE_ACCENT_W, RULE_ACCENT_H, HAIRLINE_H, TEXT_COL_W,
   DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
-  titleSize, headingSize, bodySize, bodyLines, paraSpacePt,
+  titleSize, headingSize, bodySize, bodyLines, bodyItems, paraSpacePt,
   BODY_LINE_SPACING, BULLET_INDENT,
+  bodyStyle, leadLayout, statLayout, cardLayout,
+  LEAD_W, LEAD_RULE_W, LEAD_RULE_H,
+  STAT_RULE_H, CARD_PAD, CARD_RADIUS, CARD_NUM_PT, CARD_GAP,
 } from './layout.js';
 
 const FONT = '"Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif';
@@ -117,7 +120,7 @@ export async function drawSlide(canvas, deck, slide, pageNo) {
   } else if (kind === 'media') {
     await drawMedia(ctx, S, media, mediaRegion(false));
   } else {
-    drawBody(ctx, slide.body, S, PT, CONTENT_W, t.ink);
+    drawStyledBody(ctx, S, PT, t, slide);
   }
 
   fill(ctx, t.line, M * S, FOOTER_Y * S, CONTENT_W * S, Math.max(1, HAIRLINE_H * S));
@@ -154,6 +157,114 @@ function wrapText(ctx, text, maxW) {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+// pptx.js の addStyledBody と同じ判定・同じ寸法で描く
+function drawStyledBody(ctx, S, PT, t, slide) {
+  const style = bodyStyle(slide);
+  const items = bodyItems(slide.body);
+
+  if (style === 'lead') return drawLead(ctx, S, PT, t, items[0].text);
+  if (style === 'stats') return drawStats(ctx, S, PT, t, items);
+  if (style === 'cards') return drawCards(ctx, S, PT, t, items);
+  drawBody(ctx, slide.body, S, PT, CONTENT_W, t.ink);
+}
+
+function drawLead(ctx, S, PT, t, text) {
+  const L = leadLayout(text);
+  const fontPx = L.pt * PT;
+
+  fill(ctx, t.accent, M * S, L.ruleY * S, LEAD_RULE_W * S, Math.max(2, LEAD_RULE_H * S));
+
+  ctx.fillStyle = '#' + t.ink;
+  ctx.font = `bold ${fontPx}px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  let cy = L.textY * S;
+  for (const line of wrapText(ctx, text, LEAD_W * S)) {
+    ctx.fillText(line, M * S, cy);
+    cy += L.lh * S;
+  }
+}
+
+function drawStats(ctx, S, PT, t, items) {
+  const L = statLayout(items);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  L.cells.forEach((cell, k) => {
+    if (k > 0) {
+      fill(ctx, t.line,
+           (cell.x - CARD_GAP / 2 - HAIRLINE_H / 2) * S, (CONTENT_TOP + (CONTENT_H - STAT_RULE_H) / 2) * S,
+           Math.max(1, HAIRLINE_H * S), STAT_RULE_H * S);
+    }
+
+    const cx = (cell.x + cell.w / 2) * S;
+
+    ctx.fillStyle = '#' + t.accent;
+    ctx.font = `bold ${L.valuePt * PT}px ${FONT}`;
+    ctx.fillText(L.stats[k].value, cx, (L.valueY + L.valueH / 2) * S);
+
+    ctx.fillStyle = '#' + t.muted;
+    ctx.font = `${L.labelPt * PT}px ${FONT}`;
+    ctx.fillText(L.stats[k].label, cx, (L.labelY + L.labelH / 2) * S);
+  });
+}
+
+function drawCards(ctx, S, PT, t, items) {
+  const L = cardLayout(items);
+  const surface = cardSurface(t);
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  L.cells.forEach((cell, k) => {
+    const card = L.cards[k];
+    const x = (cell.x + CARD_PAD) * S;
+    const w = L.innerW * S;
+
+    roundRect(ctx, surface, cell.x * S, cell.y * S, cell.w * S, cell.h * S, CARD_RADIUS * S);
+
+    ctx.fillStyle = '#' + t.accent;
+    ctx.font = `bold ${CARD_NUM_PT * PT}px ${FONT}`;
+    ctx.fillText(String(k + 1).padStart(2, '0'), x, (cell.y + L.numY) * S);
+
+    ctx.fillStyle = '#' + t.ink;
+    ctx.font = `bold ${L.titlePt * PT}px ${FONT}`;
+    let cy = (cell.y + L.titleY) * S;
+    const titleLh = L.titlePt * 1.3 * PT;
+    for (const line of wrapText(ctx, card.title, w)) {
+      if (cy + titleLh > (cell.y + L.titleY) * S + L.titleH * S) break;
+      ctx.fillText(line, x, cy);
+      cy += titleLh;
+    }
+
+    if (!card.desc) return;
+
+    ctx.fillStyle = '#' + t.muted;
+    ctx.font = `${L.descPt * PT}px ${FONT}`;
+    const descLh = L.descPt * BODY_LINE_SPACING * PT;
+    const descTop = (cell.y + L.descY) * S;
+    cy = descTop;
+    for (const line of wrapText(ctx, card.desc, w)) {
+      if (cy + descLh > descTop + L.descH * S) break;
+      ctx.fillText(line, x, cy);
+      cy += descLh;
+    }
+  });
+}
+
+function roundRect(ctx, color, x, y, w, h, r) {
+  ctx.fillStyle = '#' + color;
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+  } else {
+    ctx.fillRect(x, y, w, h);   // 古いブラウザでは角丸なしで描く
+  }
 }
 
 // pptx 側と同じ bodySize / 行送りを使うので、プレビューと仕上がりがそろう

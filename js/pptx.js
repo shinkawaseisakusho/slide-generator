@@ -3,7 +3,7 @@
 
    deck = { title, subtitle, theme, slides: [{ heading, body, media: [] }] } */
 
-import { getTheme } from './theme.js';
+import { getTheme, cardSurface } from './theme.js';
 import {
   SLIDE_W, SLIDE_H, M, CONTENT_W, CONTENT_TOP, CONTENT_H, FOOTER_Y,
   COVER_BAND_Y, COVER_TITLE_Y, COVER_TITLE_H, COVER_SUB_PT,
@@ -11,8 +11,11 @@ import {
   HEAD_MID, RULE_Y, RULE_ACCENT_Y, RULE_ACCENT_W, RULE_ACCENT_H,
   HAIRLINE_H, TEXT_COL_W, DIVIDER_MID, DIVIDER_RULE_Y, DIVIDER_RULE_W, PAGE_NO_DY,
   gridCells, fitRect, visibleMedia, slideKind, mediaRegion,
-  titleSize, headingSize, bodySize, bodyLines, paraSpacePt,
+  titleSize, headingSize, bodySize, bodyLines, bodyItems, paraSpacePt,
   BODY_LINE_SPACING,
+  bodyStyle, leadLayout, statLayout, cardLayout,
+  LEAD_W, LEAD_RULE_W, LEAD_RULE_H, LEAD_LINE_SPACING,
+  STAT_RULE_H, CARD_PAD, CARD_RADIUS, CARD_NUM_PT, CARD_GAP,
 } from './layout.js';
 
 /* Noto Sans JP を指定する。web で広く配布されているフォントなので、
@@ -123,11 +126,107 @@ function addContentSlide(pptx, t, slide, pageNo) {
   } else if (kind === 'media') {
     layoutMedia(pptx, s, media, mediaRegion(false));
   } else {
-    addBody(s, t, slide.body, CONTENT_W);
+    addStyledBody(pptx, s, t, slide);
   }
 
   hairline(pptx, s, M, FOOTER_Y, CONTENT_W, t.line);
   addPageNo(s, pageNo, t.muted);
+}
+
+/* 文章だけのスライドは、書かれ方に合わせて組み方を変える。
+   判定は layout.js の bodyStyle に集約してあり、プレビューと同じ結果になる。 */
+function addStyledBody(pptx, s, t, slide) {
+  const style = bodyStyle(slide);
+  const items = bodyItems(slide.body);
+
+  if (style === 'lead') return addLead(pptx, s, t, items[0].text);
+  if (style === 'stats') return addStats(pptx, s, t, items);
+  if (style === 'cards') return addCards(pptx, s, t, items);
+  addBody(s, t, slide.body, CONTENT_W);
+}
+
+// 短い一文。アクセントの短い罫線を添えて、本文領域の中央に大きく置く
+function addLead(pptx, s, t, text) {
+  const L = leadLayout(text);
+
+  s.addShape(pptx.ShapeType.rect, {
+    x: M, y: L.ruleY, w: LEAD_RULE_W, h: LEAD_RULE_H, fill: { color: t.accent },
+  });
+  s.addText(text, {
+    ...INSET,
+    x: M, y: L.textY, w: LEAD_W, h: L.textH,
+    fontFace: FONT, fontSize: L.pt, color: t.ink, bold: true,
+    align: 'left', valign: 'top',
+    lineSpacing: Math.round(L.pt * LEAD_LINE_SPACING),
+  });
+}
+
+// 数値の並び。値をそろえて大きく出し、間に縦の細い罫線を立てる
+function addStats(pptx, s, t, items) {
+  const L = statLayout(items);
+
+  L.cells.forEach((cell, k) => {
+    if (k > 0) {
+      s.addShape(pptx.ShapeType.rect, {
+        x: cell.x - CARD_GAP / 2 - HAIRLINE_H / 2,
+        y: CONTENT_TOP + (CONTENT_H - STAT_RULE_H) / 2,
+        w: HAIRLINE_H, h: STAT_RULE_H, fill: { color: t.line },
+      });
+    }
+
+    s.addText(L.stats[k].value, {
+      ...INSET,
+      x: cell.x, y: L.valueY, w: cell.w, h: L.valueH,
+      fontFace: FONT, fontSize: L.valuePt, bold: true, color: t.accent,
+      align: 'center', valign: 'middle', fit: 'shrink',
+    });
+    s.addText(L.stats[k].label, {
+      ...INSET,
+      x: cell.x, y: L.labelY, w: cell.w, h: L.labelH,
+      fontFace: FONT, fontSize: L.labelPt, color: t.muted,
+      align: 'center', valign: 'middle', fit: 'shrink',
+    });
+  });
+}
+
+// 短い箇条書き。連番つきのカードに並べ替える
+function addCards(pptx, s, t, items) {
+  const L = cardLayout(items);
+  const surface = cardSurface(t);
+
+  L.cells.forEach((cell, k) => {
+    const card = L.cards[k];
+
+    s.addShape(pptx.ShapeType.roundRect, {
+      x: cell.x, y: cell.y, w: cell.w, h: cell.h,
+      rectRadius: CARD_RADIUS, fill: { color: surface }, line: { color: surface },
+    });
+
+    s.addText(String(k + 1).padStart(2, '0'), {
+      ...INSET,
+      x: cell.x + CARD_PAD, y: cell.y + L.numY, w: L.innerW, h: (CARD_NUM_PT * 1.6) / 72,
+      fontFace: FONT, fontSize: CARD_NUM_PT, bold: true, color: t.accent,
+      align: 'left', valign: 'middle',
+    });
+
+    s.addText(card.title, {
+      ...INSET,
+      x: cell.x + CARD_PAD, y: cell.y + L.titleY, w: L.innerW, h: L.titleH,
+      fontFace: FONT, fontSize: L.titlePt, bold: true, color: t.ink,
+      align: 'left', valign: 'top', fit: 'shrink',
+      lineSpacing: Math.round(L.titlePt * 1.3),
+    });
+
+    if (card.desc) {
+      s.addText(card.desc, {
+        ...INSET,
+        x: cell.x + CARD_PAD, y: cell.y + L.descY, w: L.innerW, h: L.descH,
+        fontFace: FONT, fontSize: L.descPt, color: t.muted,
+        align: 'left', valign: 'top', fit: 'shrink',
+        lineSpacing: Math.round(L.descPt * BODY_LINE_SPACING),
+      });
+    }
+  });
 }
 
 // 本文。枠に収まる大きさをあらかじめ計算しているので自動縮小に頼らない

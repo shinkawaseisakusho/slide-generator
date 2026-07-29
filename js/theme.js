@@ -29,3 +29,18 @@ export function normalizeTheme(key) {
 export function getTheme(key) {
   return THEMES[normalizeTheme(key)];
 }
+
+/* 2色を混ぜる。ratio は a の割合。テーマに色を足さずに
+   「背景をほんの少しだけアクセント寄りにした面」を作るために使う。 */
+export function mix(a, b, ratio) {
+  const hex = h => [0, 2, 4].map(i => parseInt(String(h).slice(i, i + 2), 16));
+  const [ar, ag, ab] = hex(a);
+  const [br, bg, bb] = hex(b);
+  const ch = (x, y) => Math.round(x * ratio + y * (1 - ratio)).toString(16).padStart(2, '0');
+  return (ch(ar, br) + ch(ag, bg) + ch(ab, bb)).toUpperCase();
+}
+
+// カードの下地。背景との差はごくわずかで、面があることだけが分かる濃さ
+export function cardSurface(t) {
+  return mix(t.accent, t.bg, 0.07);
+}

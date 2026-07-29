@@ -73,17 +73,17 @@ export function mediaRegion(withText) {
 /* ---------- メディアの配置 ---------- */
 
 // 領域を n 分割する。横長の領域なら横並び、縦長なら縦積み。4点は2x2。
-export function gridCells(region, n) {
+export function gridCells(region, n, gap = GAP) {
   const cells = [];
   const push = (x, y, w, h) => cells.push({ x, y, w, h });
 
   if (n === 1) { push(region.x, region.y, region.w, region.h); return cells; }
 
   if (n === 4) {
-    const w = (region.w - GAP) / 2;
-    const h = (region.h - GAP) / 2;
+    const w = (region.w - gap) / 2;
+    const h = (region.h - gap) / 2;
     for (let r = 0; r < 2; r++) {
-      for (let c = 0; c < 2; c++) push(region.x + c * (w + GAP), region.y + r * (h + GAP), w, h);
+      for (let c = 0; c < 2; c++) push(region.x + c * (w + gap), region.y + r * (h + gap), w, h);
     }
     return cells;
   }
@@ -91,11 +91,11 @@ export function gridCells(region, n) {
   // 2点・3点は領域の縦横比で並べ方を決める
   const horizontal = region.w / region.h > 1.5;
   if (horizontal) {
-    const w = (region.w - GAP * (n - 1)) / n;
-    for (let k = 0; k < n; k++) push(region.x + k * (w + GAP), region.y, w, region.h);
+    const w = (region.w - gap * (n - 1)) / n;
+    for (let k = 0; k < n; k++) push(region.x + k * (w + gap), region.y, w, region.h);
   } else {
-    const h = (region.h - GAP * (n - 1)) / n;
-    for (let k = 0; k < n; k++) push(region.x, region.y + k * (h + GAP), region.w, h);
+    const h = (region.h - gap * (n - 1)) / n;
+    for (let k = 0; k < n; k++) push(region.x, region.y + k * (h + gap), region.w, h);
   }
   return cells;
 }
@@ -201,4 +201,178 @@ export function parseLine(line) {
 
 export function bodyLines(body) {
   return String(body || '').split(/\r?\n/).map(parseLine);
+}
+
+// 空行を除いた本文の行
+export function bodyItems(body) {
+  return bodyLines(body).filter(l => l.text);
+}
+
+/* ---------- 本文の見せ方 ----------
+
+   同じ「文章だけのスライド」でも、書かれ方によって最適な組み方は違う。
+   短い一文はリード文、数値の並びは大きな数字、短い箇条書きはカード。
+   ここで種類を決め、pptx.js と preview.js が同じ判定で描く。 */
+
+export const CARD_MIN = 2;                   // カード／数値組みにする行数の下限
+export const CARD_MAX = 4;                   // 同・上限（これを超えるとベタ組み）
+export const CARD_GAP = 0.22;
+export const CARD_PAD = 0.3;
+export const CARD_RADIUS = 0.09;
+export const CARD_NUM_PT = 11;               // 01, 02 … の連番
+export const CARD_TITLE_MAX_PT = 17;
+export const CARD_TITLE_MIN_PT = 10;
+export const CARD_DESC_MAX_PT = 11;
+export const CARD_DESC_MIN_PT = 8;
+
+export const STAT_MAX_PT = 54;
+export const STAT_MIN_PT = 22;
+export const STAT_LABEL_PT = 12;
+export const STAT_RULE_H = 1.15;             // 数値の間に立てる縦の細い罫線
+
+export const LEAD_W = 7.2;                   // リード文の折り返し幅
+export const LEAD_MAX_PT = 30;
+export const LEAD_MIN_PT = 15;
+export const LEAD_LINE_SPACING = 1.4;
+export const LEAD_RULE_W = 0.9;
+export const LEAD_RULE_H = 0.05;
+export const LEAD_RULE_GAP = 0.28;           // 罫線と本文の間
+
+const LEAD_MAX_UNITS = 46;                   // これより長い一文はベタ組みに戻す
+const CARD_MAX_UNITS = 40;                   // カード1枚に入れられる長さ
+
+/* 数値と単位。「30%」「1,200件」のような、そのままで意味が通る値だけを拾う。
+   年号や日付を数値として拾わないよう、値とラベルの間に空白を必須にしている。 */
+const UNIT = '%|％|倍|件|人|名|社|校|円|万円|億円|万|億|時間|分|秒|日|年|ヶ月|か月|カ月|週|回|台|個|pt|ポイント|x|×';
+const VALUE = `[+\\-−]?[0-9][0-9,.]*\\s*(?:${UNIT})?`;
+const VALUE_ONLY_RE = new RegExp(`^${VALUE}$`);
+const VALUE_HEAD_RE = new RegExp(`^(${VALUE})[ 　]+(.+)$`);
+
+/* 「30% 前年比」「売上：30%」「30%：前年比」を {value, label} に分ける。
+   数値として読めない行は null を返し、呼び出し側でカード組みに落とす。 */
+export function parseStat(text) {
+  const s = String(text || '').trim();
+
+  const parts = s.split(/\s*[:：]\s*/);
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    if (VALUE_ONLY_RE.test(parts[1])) return { value: parts[1], label: parts[0] };
+    if (VALUE_ONLY_RE.test(parts[0])) return { value: parts[0], label: parts[1] };
+    return null;
+  }
+
+  const m = s.match(VALUE_HEAD_RE);
+  return m ? { value: m[1].trim(), label: m[2].trim() } : null;
+}
+
+// 「見出し：説明」をカードの2段に分ける。区切りがなければ見出しだけのカード
+export function parseCard(text) {
+  const s = String(text || '').trim();
+  const i = s.search(/[:：]/);
+  if (i <= 0) return { title: s, desc: '' };
+  return { title: s.slice(0, i).trim(), desc: s.slice(i + 1).trim() };
+}
+
+/* 本文の組み方を決める。カード・数値組みは「利用者が箇条書きとして書いた」
+   ことを条件にしている。ふつうの文章が勝手にカードへ化けると読みにくい。 */
+export function bodyStyle(slide) {
+  if (slideKind(slide) !== 'text') return 'text';
+
+  const items = bodyItems(slide.body);
+  if (!items.length) return 'text';
+
+  if (items.length === 1 && !items[0].bullet && textUnits(items[0].text) <= LEAD_MAX_UNITS) {
+    return 'lead';
+  }
+  if (items.length < CARD_MIN || items.length > CARD_MAX) return 'text';
+  if (!items.every(l => l.bullet)) return 'text';
+  if (items.every(l => parseStat(l.text))) return 'stats';
+  if (items.every(l => textUnits(l.text) <= CARD_MAX_UNITS)) return 'cards';
+  return 'text';
+}
+
+export function contentRegion() {
+  return { x: M, y: CONTENT_TOP, w: CONTENT_W, h: CONTENT_H };
+}
+
+/* ---------- リード文 ---------- */
+
+// 罫線と本文をひとかたまりとして、本文領域の中央に置く
+export function leadLayout(text) {
+  const pt = fitFontSize(text, LEAD_W, LEAD_MAX_PT, LEAD_MIN_PT);
+  const perLine = (LEAD_W * 72) / pt;
+  const lines = Math.max(1, Math.ceil(textUnits(text) / perLine));
+  const lh = (pt * LEAD_LINE_SPACING) / 72;
+  const textH = lines * lh;
+  const top = CONTENT_TOP + (CONTENT_H - (LEAD_RULE_H + LEAD_RULE_GAP + textH)) / 2;
+
+  return { pt, lines, lh, textH, ruleY: top, textY: top + LEAD_RULE_H + LEAD_RULE_GAP };
+}
+
+/* ---------- 数値組み ---------- */
+
+export function statLayout(items) {
+  const stats = items.map(l => parseStat(l.text));
+  const cells = gridCells(contentRegion(), stats.length, CARD_GAP);
+  const colW = cells[0].w;
+
+  // いちばん長い値に合わせる。数字の大きさがそろっていないと比較して見えない
+  const valuePt = Math.min(...stats.map(s => fitFontSize(s.value, colW - 0.2, STAT_MAX_PT, STAT_MIN_PT)));
+  const labelPt = Math.min(...stats.map(s => fitFontSize(s.label, colW - 0.2, STAT_LABEL_PT, 8)));
+
+  const valueH = (valuePt * 1.2) / 72;
+  const labelH = (labelPt * 1.5) / 72;
+  const groupH = valueH + 0.12 + labelH;
+  const top = CONTENT_TOP + (CONTENT_H - groupH) / 2;
+
+  return { stats, cells, valuePt, labelPt, valueH, labelH, valueY: top, labelY: top + valueH + 0.12 };
+}
+
+/* ---------- カード組み ---------- */
+
+export function cardLayout(items) {
+  const cards = items.map(l => parseCard(l.text));
+  const region = contentRegion();
+  const grid = gridCells(region, cards.length, CARD_GAP);
+  const rows = cards.length === 4 ? 2 : 1;
+  const availH = grid[0].h;
+  const innerW = grid[0].w - CARD_PAD * 2;
+
+  const titlePt = Math.min(...cards.map(c => fitFontSize(c.title, innerW, CARD_TITLE_MAX_PT, CARD_TITLE_MIN_PT)));
+  const titleLines = Math.max(...cards.map(
+    c => Math.min(2, Math.max(1, Math.ceil(textUnits(c.title) / ((innerW * 72) / titlePt))))));
+
+  const numH = (CARD_NUM_PT * 1.6) / 72;
+  const titleH = (titleLines * titlePt * 1.3) / 72;
+  const headH = CARD_PAD + numH + 0.1 + titleH;
+  const hasDesc = cards.some(c => c.desc);
+  const descY = headH + (hasDesc ? 0.12 : 0);
+
+  /* 説明文は全カードで同じ大きさにそろえる。いちばん長いカードを基準に、
+     カードの高さに収まるところまで下げる。 */
+  let descPt = CARD_DESC_MAX_PT;
+  let descH = 0;
+  for (; descPt > CARD_DESC_MIN_PT; descPt--) {
+    descH = Math.max(0, ...cards.map(c => (c.desc
+      ? (estimateBodyLines(c.desc, innerW, descPt) * descPt * BODY_LINE_SPACING) / 72
+      : 0)));
+    if (descY + descH + CARD_PAD <= availH) break;
+  }
+
+  /* カードの高さは中身ぶんだけにして、余ったぶんは上下に振り分ける。
+     領域いっぱいに引き伸ばすと、短い文言のときに間延びして見える。 */
+  const cardH = Math.min(availH, descY + descH + CARD_PAD);
+  const usedH = cardH * rows + (rows - 1) * CARD_GAP;
+  const top = region.y + (region.h - usedH) / 2;
+  const cells = grid.map((c, i) => ({
+    x: c.x, w: c.w, h: cardH,
+    y: top + (cards.length === 4 ? Math.floor(i / 2) : 0) * (cardH + CARD_GAP),
+  }));
+
+  return {
+    cards, cells, innerW, titlePt, titleH, descPt,
+    descH: Math.min(descH, cardH - descY - CARD_PAD),
+    numY: CARD_PAD,
+    titleY: CARD_PAD + numH + 0.1,
+    descY,
+  };
 }
