@@ -5,6 +5,8 @@
    ここは状態と DOM の担当。実際の描画・生成・保存は各モジュールへ。
      layout.js  … 寸法とレイアウト計算（pptx と プレビューで共有）
      theme.js   … 配色
+     designs/   … デザイン3種（骨格）。配色とは独立した軸
+     surface.js … 描画の抽象化。デザインを pptx と canvas の両方へ流す
      pptx.js    … .pptx の組み立て
      preview.js … 確認画面のプレビュー描画
      media.js   … 画像の取り込み
@@ -12,6 +14,7 @@
    ========================================================= */
 
 import { THEMES, DEFAULT_THEME, normalizeTheme } from './theme.js';
+import { DESIGNS, DEFAULT_DESIGN, normalizeDesign } from './designs/index.js';
 import { MAX_MEDIA } from './layout.js';
 import { buildPptx, safeFileName } from './pptx.js';
 import { drawCover, drawSlide } from './preview.js';
@@ -46,10 +49,15 @@ const el = {
   file:      document.getElementById('file'),
   cards:     document.getElementById('cards'),
   themes:    document.getElementById('themes'),
+  designs:   document.getElementById('designs'),
   add:       document.getElementById('btn-add'),
   download:  document.getElementById('btn-download'),
   howto:     document.getElementById('howto'),
   toast:     document.getElementById('toast'),
+  ask:       document.getElementById('ask'),
+  askText:   document.getElementById('ask-text'),
+  askYes:    document.getElementById('ask-yes'),
+  askNo:     document.getElementById('ask-no'),
   overlay:   document.getElementById('overlay'),
   overlayTx: document.getElementById('overlay-text'),
 };
@@ -74,7 +82,9 @@ let lastDeleted = null;  // 「元に戻す」用
 function newState() {
   return {
     title: '', subtitle: '', slides: [],
-    phase: 'title', i: 0, theme: DEFAULT_THEME, skipMedia: false, log: [],
+    phase: 'title', i: 0,
+    theme: DEFAULT_THEME, design: DEFAULT_DESIGN,
+    skipMedia: false, log: [],
   };
 }
 
@@ -283,6 +293,7 @@ function snapshot() {
     phase: state.phase,
     i: state.i,
     theme: state.theme,
+    design: state.design,
     skipMedia: state.skipMedia,
     log: state.log.slice(),
   };
@@ -493,6 +504,7 @@ function renderCards() {
   el.cards.appendChild(coverCard());
   state.slides.forEach((slide, idx) => el.cards.appendChild(slideCard(slide, idx)));
   el.download.disabled = !state.title.trim();
+  renderDesigns();
   renderThemes();
   refreshPreviews();
 }
@@ -651,6 +663,45 @@ function moveMedia(slideIdx, mediaIdx, delta) {
   renderCards();
 }
 
+/* ---------- デザイン選択 ----------
+
+   見本は実際の表紙をそのまま小さく描く。CSS で似せた飾りにすると
+   デザインを足したり直したりするたびに見本もずれていくため。 */
+
+function renderDesigns() {
+  el.designs.textContent = '';
+
+  Object.keys(DESIGNS).forEach((key) => {
+    const on = key === state.design;
+
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'design-swatch' + (on ? ' on' : '');
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(on));
+    b.title = DESIGNS[key].label;
+
+    const prev = div('design-prev');
+    const canvas = document.createElement('canvas');
+    prev.appendChild(canvas);
+
+    const name = document.createElement('span');
+    name.textContent = DESIGNS[key].label;
+
+    b.append(prev, name);
+    b.addEventListener('click', () => {
+      if (state.design === key) return;
+      state.design = key;
+      save();
+      renderDesigns();
+      refreshPreviews();
+    });
+
+    el.designs.appendChild(b);
+    drawCover(canvas, { ...state, design: key });
+  });
+}
+
 /* ---------- テーマ選択 ---------- */
 
 function renderThemes() {
@@ -685,6 +736,7 @@ function renderThemes() {
       state.theme = key;
       save();
       renderThemes();
+      renderDesigns();   // 見本の表紙も配色が変わる
       refreshPreviews();
     });
 
@@ -852,6 +904,7 @@ function applyDraft(data) {
     phase: data.phase === 'image' ? 'media' : (data.phase || 'title'),
     i: typeof data.i === 'number' ? data.i : 0,
     theme: normalizeTheme(data.theme),
+    design: normalizeDesign(data.design),
     skipMedia: Boolean(data.skipMedia),
     log: data.log,
   };
@@ -859,7 +912,12 @@ function applyDraft(data) {
 }
 
 async function reset() {
-  if (!confirm('入力した内容をすべて消して、最初からやり直しますか？')) return;
+  const ok = await askConfirm(
+    '入力した内容をすべて消して、最初からやり直しますか？\nこの操作は取り消せません。',
+    'やり直す',
+  );
+  if (!ok) return;
+
   clearTimeout(saveTimer);
   await clearDraft();
   state = newState();
@@ -897,6 +955,44 @@ function toast(message, actionLabel, onAction) {
   el.toast.classList.remove('hidden');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.toast.classList.add('hidden'), actionLabel ? 6000 : 2600);
+}
+
+/* 確認ダイアログ。confirm() を使わないのは、ブラウザ標準の見た目が
+   アプリから浮くうえ、端末によって文言や配置が変わるため。
+
+   伝えるだけの内容はトーストで出す。ここを使うのは、取り消せない操作に
+   限る（トーストの操作ボタンでは押し損ねたときに戻せない）。 */
+function askConfirm(message, yesLabel) {
+  const before = document.activeElement;   // 閉じたあとに戻す先
+
+  el.askText.textContent = message;
+  el.askYes.textContent = yesLabel;
+  el.ask.classList.remove('hidden');
+
+  // 開いた直後は「キャンセル」に合わせる。誤って確定させないため
+  el.askNo.focus();
+
+  return new Promise((resolve) => {
+    const close = (answer) => {
+      el.ask.classList.add('hidden');
+      el.askYes.removeEventListener('click', onYes);
+      el.askNo.removeEventListener('click', onNo);
+      el.ask.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      if (before && before.focus) before.focus();
+      resolve(answer);
+    };
+    const onYes = () => close(true);
+    const onNo = () => close(false);
+    // 枠の外を押したときは取りやめ
+    const onBackdrop = (e) => { if (e.target === el.ask) close(false); };
+    const onKey = (e) => { if (e.key === 'Escape') close(false); };
+
+    el.askYes.addEventListener('click', onYes);
+    el.askNo.addEventListener('click', onNo);
+    el.ask.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+  });
 }
 
 function showOverlay(text) {

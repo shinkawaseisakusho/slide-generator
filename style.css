@@ -282,28 +282,36 @@ svg { width: 1em; height: 1em; display: block; }
 
 .review-sub { margin: 0 0 26px; color: var(--muted); font-size: 13.5px; }
 
+/* スライド1枚ぶんのカード。
+   境目を線の濃さで示そうとすると弱いので、面を一段持ち上げて
+   ページの地色と分ける。あいだの余白もはっきり取る。
+   影は使わない（このアプリの作り方に合わせる）。 */
 .card {
+  background: var(--elev);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 16px;
-  margin-bottom: 10px;
+  padding: 16px 16px 18px;
+  margin-bottom: 22px;
   transition: border-color .15s var(--ease);
 }
 .card:focus-within { border-color: var(--line-strong); }
 
+/* 見出し行はカードの帯として扱い、下に罫線を渡して中身と切る */
 .card-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 14px;
+  margin: -2px 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
 }
 
 .badge {
   flex: 1;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
   letter-spacing: .1em;
-  color: var(--muted);
+  color: var(--text);
 }
 
 .mini-btn {
@@ -316,7 +324,7 @@ svg { width: 1em; height: 1em; display: block; }
   font-size: 14px;
   transition: color .15s var(--ease), background .15s var(--ease);
 }
-.mini-btn:hover:not(:disabled) { color: var(--text); background: var(--elev); }
+.mini-btn:hover:not(:disabled) { color: var(--text); background: var(--bg); }
 .mini-btn:disabled { opacity: .25; }
 .mini-btn.del:hover:not(:disabled) { color: var(--danger); }
 
@@ -337,7 +345,8 @@ svg { width: 1em; height: 1em; display: block; }
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: transparent;
+  /* カードが一段持ち上がった面なので、入力欄は地色に戻して沈ませる */
+  background: var(--bg);
   color: var(--text);
   resize: vertical;
   outline: none;
@@ -349,10 +358,10 @@ svg { width: 1em; height: 1em; display: block; }
 /* --- スライドのプレビュー --- */
 .card-preview {
   margin: 0 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
   overflow: hidden;
-  background: var(--elev);
+  background: var(--bg);
 }
 
 .preview-canvas {
@@ -392,7 +401,7 @@ svg { width: 1em; height: 1em; display: block; }
 .media-ph {
   display: grid;
   place-items: center;
-  background: var(--elev);
+  background: var(--bg);
   color: var(--muted);
   font-size: 17px;
 }
@@ -456,6 +465,49 @@ svg { width: 1em; height: 1em; display: block; }
   transition: color .15s var(--ease), border-color .15s var(--ease);
 }
 .ghost-btn:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* --- デザイン選択 --- */
+/* 見本は実際の表紙を描いた canvas。3列なのでテーマより大きく見せる */
+.design-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 11px;
+  padding: 3px 1px 4px;
+}
+
+.design-swatch {
+  width: 100%;
+  padding: 0;
+  text-align: center;
+}
+
+.design-swatch > span {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color .15s var(--ease);
+}
+.design-swatch.on > span { color: var(--text); font-weight: 600; }
+
+.design-prev {
+  width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  line-height: 0;
+  transition: box-shadow .15s var(--ease);
+}
+.design-swatch.on .design-prev {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
+}
+.design-swatch:hover .design-prev { border-color: var(--line-strong); }
+
+.design-prev canvas { width: 100%; display: block; }
 
 /* --- テーマカラー選択 --- */
 .theme-picker { margin-bottom: 26px; }
@@ -615,6 +667,53 @@ svg { width: 1em; height: 1em; display: block; }
   padding: 2px 0;
 }
 .toast-action:hover { opacity: .75; }
+
+/* --- 確認ダイアログ --- */
+/* 取り消せない操作だけに使う。伝えるだけの内容はトーストで出す */
+.ask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.ask-panel {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  padding: 22px 20px 16px;
+  animation: rise .2s var(--ease) both;
+}
+
+.ask-text {
+  margin: 0 0 18px;
+  font-size: 14.5px;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.ask-row { display: flex; gap: 8px; }
+
+.ask-btn {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color .15s var(--ease), color .15s var(--ease);
+}
+.ask-btn:hover { border-color: var(--text); }
+.ask-btn.danger { color: var(--danger); border-color: var(--danger); }
+.ask-btn.danger:hover { background: var(--danger); color: var(--accent-fg); }
 
 .overlay {
   position: fixed;

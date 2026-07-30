@@ -69,6 +69,11 @@
     <p class="review-sub">タップして直せます。並べ替え・削除もできます。<br>最後にダウンロードしてください。</p>
 
     <div class="theme-picker">
+      <span class="picker-label">デザイン</span>
+      <div id="designs" class="design-row" role="radiogroup" aria-label="デザイン"></div>
+    </div>
+
+    <div class="theme-picker">
       <span class="picker-label">テーマカラー</span>
       <div id="themes" class="theme-row" role="radiogroup" aria-label="テーマカラー"></div>
     </div>
@@ -103,6 +108,17 @@
 </main>
 
 <div id="toast" class="toast hidden"></div>
+
+<!-- 確認は confirm() を使わず、アプリの中で聞く -->
+<div id="ask" class="ask hidden" role="dialog" aria-modal="true" aria-labelledby="ask-text">
+  <div class="ask-panel">
+    <p id="ask-text" class="ask-text"></p>
+    <div class="ask-row">
+      <button id="ask-no" class="ask-btn" type="button">キャンセル</button>
+      <button id="ask-yes" class="ask-btn danger" type="button">やり直す</button>
+    </div>
+  </div>
+</div>
 
 <div id="overlay" class="overlay hidden">
   <div class="spinner"><span></span><span></span><span></span></div>

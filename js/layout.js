@@ -10,15 +10,15 @@ export const SLIDE_H = 5.625;
 export const M = 0.75;                       // 左右の余白
 export const CONTENT_W = SLIDE_W - M * 2;    // 8.5
 export const GAP = 0.14;                     // メディア同士のすき間
-export const CONTENT_TOP = 1.6;
+export const CONTENT_TOP = 1.36;
 export const FOOTER_Y = 5.16;                // 下端の罫線。本文はこの上まで使える
 export const CONTENT_H = FOOTER_Y - 0.16 - CONTENT_TOP;
 export const MAX_MEDIA = 4;                  // 1枚のスライドに載せられるメディアの数
 
 export const HAIRLINE_H = 0.012;             // 細い罫線の太さ
 
-export const HEAD_MID = 0.72;                // 見出しの中心
-export const RULE_Y = 1.19;                  // 見出し下の細い罫線
+export const HEAD_MID = 0.58;                // 見出しの中心
+export const RULE_Y = 0.97;                  // 見出し下の細い罫線
 export const RULE_ACCENT_W = 0.85;           // 左端に重ねる太い線
 export const RULE_ACCENT_H = 0.042;
 export const RULE_ACCENT_Y = RULE_Y - (RULE_ACCENT_H - HAIRLINE_H) / 2;
@@ -64,10 +64,20 @@ export function slideKind(slide) {
   return hasMedia ? 'media' : 'text';
 }
 
-// メディアを置く領域。文章と並ぶときは右半分、単独なら全幅
+// メディアを置く領域。文章と並ぶときは右半分
 export function mediaRegion(withText) {
   const x = withText ? M + TEXT_COL_W + 0.6 : M;
   return { x, y: CONTENT_TOP, w: SLIDE_W - M - x, h: CONTENT_H };
+}
+
+/* 画像だけのスライドの領域。
+
+   本文と同じ余白の中に収めると、正方形に近い写真は高さで頭を打ち、
+   左右に大きな余白が残って小さく見える。文章がないぶん余白を使う
+   理由もないので、見出しの下から下端まで、幅もスライドいっぱいに使う。
+   16:9 に対して縦が制約になるので、ここを広げるのが唯一効く。 */
+export function mediaFullRegion(top) {
+  return { x: 0, y: top, w: SLIDE_W, h: SLIDE_H - top };
 }
 
 /* ---------- メディアの配置 ---------- */
@@ -219,11 +229,15 @@ export const CARD_MAX = 4;                   // 同・上限（これを超え�
 export const CARD_GAP = 0.22;
 export const CARD_PAD = 0.3;
 export const CARD_RADIUS = 0.09;
-export const CARD_NUM_PT = 11;               // 01, 02 … の連番
-export const CARD_TITLE_MAX_PT = 17;
+/* カードの中の文字。上限を低く抑えると、カードが大きいときに
+   中身だけが小さく残って間延びする。上限は広めに取り、幅に対する
+   自動縮小（fitFontSize）に任せる。 */
+export const CARD_TITLE_MAX_PT = 22;
 export const CARD_TITLE_MIN_PT = 10;
-export const CARD_DESC_MAX_PT = 11;
+export const CARD_DESC_MAX_PT = 14;
 export const CARD_DESC_MIN_PT = 8;
+export const CARD_NUM_MAX_PT = 14;           // 01, 02 … の連番
+export const CARD_NUM_MIN_PT = 9;
 
 export const STAT_MAX_PT = 54;
 export const STAT_MIN_PT = 22;
@@ -296,23 +310,25 @@ export function contentRegion() {
 
 /* ---------- リード文 ---------- */
 
-// 罫線と本文をひとかたまりとして、本文領域の中央に置く
-export function leadLayout(text) {
-  const pt = fitFontSize(text, LEAD_W, LEAD_MAX_PT, LEAD_MIN_PT);
-  const perLine = (LEAD_W * 72) / pt;
+/* 罫線と本文をひとかたまりとして、領域の中央に置く。
+   region はデザインごとに違うため引数で受ける（既定は本文領域）。 */
+export function leadLayout(text, region = contentRegion(), maxPt = LEAD_MAX_PT) {
+  const w = Math.min(LEAD_W, region.w);
+  const pt = fitFontSize(text, w, maxPt, LEAD_MIN_PT);
+  const perLine = (w * 72) / pt;
   const lines = Math.max(1, Math.ceil(textUnits(text) / perLine));
   const lh = (pt * LEAD_LINE_SPACING) / 72;
   const textH = lines * lh;
-  const top = CONTENT_TOP + (CONTENT_H - (LEAD_RULE_H + LEAD_RULE_GAP + textH)) / 2;
+  const top = region.y + (region.h - (LEAD_RULE_H + LEAD_RULE_GAP + textH)) / 2;
 
-  return { pt, lines, lh, textH, ruleY: top, textY: top + LEAD_RULE_H + LEAD_RULE_GAP };
+  return { pt, w, lines, lh, textH, ruleY: top, textY: top + LEAD_RULE_H + LEAD_RULE_GAP };
 }
 
 /* ---------- 数値組み ---------- */
 
-export function statLayout(items) {
+export function statLayout(items, region = contentRegion()) {
   const stats = items.map(l => parseStat(l.text));
-  const cells = gridCells(contentRegion(), stats.length, CARD_GAP);
+  const cells = gridCells(region, stats.length, CARD_GAP);
   const colW = cells[0].w;
 
   // いちばん長い値に合わせる。数字の大きさがそろっていないと比較して見えない
@@ -322,16 +338,15 @@ export function statLayout(items) {
   const valueH = (valuePt * 1.2) / 72;
   const labelH = (labelPt * 1.5) / 72;
   const groupH = valueH + 0.12 + labelH;
-  const top = CONTENT_TOP + (CONTENT_H - groupH) / 2;
+  const top = region.y + (region.h - groupH) / 2;
 
   return { stats, cells, valuePt, labelPt, valueH, labelH, valueY: top, labelY: top + valueH + 0.12 };
 }
 
 /* ---------- カード組み ---------- */
 
-export function cardLayout(items) {
+export function cardLayout(items, region = contentRegion()) {
   const cards = items.map(l => parseCard(l.text));
-  const region = contentRegion();
   const grid = gridCells(region, cards.length, CARD_GAP);
   const rows = cards.length === 4 ? 2 : 1;
   const availH = grid[0].h;
@@ -341,7 +356,10 @@ export function cardLayout(items) {
   const titleLines = Math.max(...cards.map(
     c => Math.min(2, Math.max(1, Math.ceil(textUnits(c.title) / ((innerW * 72) / titlePt))))));
 
-  const numH = (CARD_NUM_PT * 1.6) / 72;
+  // 連番は見出しに従わせる。固定にすると見出しが大きいときだけ浮いて見える
+  const numPt = Math.max(CARD_NUM_MIN_PT, Math.min(CARD_NUM_MAX_PT, Math.round(titlePt * 0.6)));
+
+  const numH = (numPt * 1.6) / 72;
   const titleH = (titleLines * titlePt * 1.3) / 72;
   const headH = CARD_PAD + numH + 0.1 + titleH;
   const hasDesc = cards.some(c => c.desc);
@@ -369,7 +387,7 @@ export function cardLayout(items) {
   }));
 
   return {
-    cards, cells, innerW, titlePt, titleH, descPt,
+    cards, cells, innerW, titlePt, titleH, descPt, numPt, numH,
     descH: Math.min(descH, cardH - descY - CARD_PAD),
     numY: CARD_PAD,
     titleY: CARD_PAD + numH + 0.1,
